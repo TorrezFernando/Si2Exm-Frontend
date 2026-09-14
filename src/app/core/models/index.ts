@@ -1,0 +1,193 @@
+// ─── Auth & RBAC Models ─────────────────────────────────────────────────────────
+export interface LoginRequest {
+  username: string; // FastAPI uses 'username' for OAuth2
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  full_name?: string;
+  phone?: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  role: string | null;
+}
+
+export interface Permission {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+export interface Role {
+  id: number;
+  name: string;
+  description?: string;
+  is_predefined: boolean;
+  permissions: Permission[];
+}
+
+export interface UserPermission {
+  permission: Permission;
+  is_granted: boolean;
+}
+
+export interface User {
+  id: number;
+  email: string;
+  full_name?: string;
+  phone?: string;
+  role_id?: number;
+  role?: Role;
+  user_permissions: UserPermission[];
+  branch_id?: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CreateUserByAdmin {
+  email: string;
+  full_name?: string;
+  phone?: string;
+  password: string;
+  role_id: number;
+  branch_id?: number;
+}
+
+export interface UpdateUser {
+  full_name?: string;
+  phone?: string;
+  role_id?: number;
+  branch_id?: number;
+  is_active?: boolean;
+}
+
+export interface PasswordChange {
+  current_password: string;
+  new_password: string;
+}
+
+// ─── Audit Log Models ──────────────────────────────────────────────────────
+export interface AuditLog {
+  id: number;
+  user_id?: number;
+  action: string;
+  entity_type: string;
+  entity_id?: string;
+  details?: any;
+  created_at: string;
+}
+
+
+// ─── Branch Models ────────────────────────────────────────────────────────
+export interface Branch {
+  id: number;
+  name: string;
+  address: string;
+  phone?: string;
+  is_active: boolean;
+}
+
+export interface CreateBranch {
+  name: string;
+  address: string;
+  phone?: string;
+}
+
+// ─── Product Models ───────────────────────────────────────────────────────
+export interface Category {
+  id: number;
+  name: string;
+  description?: string;
+  image_url?: string;
+}
+
+export interface Product {
+  id: number;
+  name: string;
+  description?: string;
+  base_price: number;
+  category_id?: number;
+  season?: string;
+  image_url?: string;
+  category?: Category;
+  variants?: ProductVariant[];
+}
+
+export interface ProductVariant {
+  id: number;
+  product_id: number;
+  size: string;
+  color: string;
+  sku: string;
+  price_override?: number;
+  image_url?: string;
+  inventories?: Inventory[];
+}
+
+export interface Inventory {
+  id: number;
+  branch_id: number;
+  variant_id: number;
+  stock: number;
+  branch?: Branch;
+}
+
+// ─── Reservation Models ───────────────────────────────────────────────────
+export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
+
+export interface Reservation {
+  id: number;
+  user_id: number;
+  branch_id: number;
+  status: ReservationStatus;
+  created_at: string;
+  updated_at?: string;
+  user?: User;
+  branch?: Branch;
+  items?: ReservationItem[];
+}
+
+export interface ReservationItem {
+  id: number;
+  reservation_id: number;
+  variant_id: number;
+  quantity: number;
+  variant?: ProductVariant;
+}
+
+// ─── Order Models ─────────────────────────────────────────────────────────
+export interface Order {
+  id: number;
+  user_id: number;
+  branch_id?: number;
+  total_amount: number;
+  is_paid: boolean;
+  payment_provider?: string;
+  payment_id?: string;
+  created_at: string;
+  items?: OrderItem[];
+}
+
+export interface OrderItem {
+  id: number;
+  order_id: number;
+  variant_id: number;
+  quantity: number;
+  unit_price: number;
+}
+
+// ─── Pagination ───────────────────────────────────────────────────────────
+export interface PaginationParams {
+  skip?: number;
+  limit?: number;
+}
+
+// ─── API Error ────────────────────────────────────────────────────────────
+export interface ApiError {
+  detail: string | { msg: string; type: string }[];
+}

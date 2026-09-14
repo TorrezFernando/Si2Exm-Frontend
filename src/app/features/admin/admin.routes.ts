@@ -1,0 +1,40 @@
+import { Routes } from '@angular/router';
+import { AdminLayoutComponent } from './layout/admin-layout.component';
+
+export const adminRoutes: Routes = [
+  {
+    path: '',
+    component: AdminLayoutComponent,
+    children: [
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent)
+      },
+      {
+        path: 'users',
+        loadComponent: () => import('./users/users.component').then(m => m.UsersComponent)
+      },
+      {
+        path: 'branches',
+        loadComponent: () => import('./branches/branches.component').then(m => m.BranchesComponent)
+      },
+      {
+        path: 'products',
+        loadComponent: () => import('./products/products.component').then(m => m.ProductsComponent)
+      },
+      {
+        path: 'roles',
+        loadComponent: () => import('./roles/roles.component').then(m => m.RolesComponent)
+      },
+      {
+        path: 'audit',
+        loadComponent: () => import('./audit/audit.component').then(m => m.AuditComponent)
+      },
+      {
+        path: 'reservations',
+        loadComponent: () => import('./reservations/reservations.component').then(m => m.ReservationsComponent)
+      }
+    ]
+  }
+];
