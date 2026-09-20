@@ -30,22 +30,43 @@ interface Message {
 
         <div class="chat-messages" #scrollContainer>
           <div *ngFor="let msg of messages()" 
-               class="message" 
-               [ngClass]="msg.role === 'user' ? 'msg-user' : 'msg-ai'">
-            {{ msg.content }}
+               class="message-container" 
+               [ngClass]="msg.role === 'user' ? 'msg-user-container' : 'msg-ai-container'">
+            <div class="message" [ngClass]="msg.role === 'user' ? 'msg-user' : 'msg-ai'">
+              {{ msg.content }}
+            </div>
+            <div *ngIf="msg.role === 'model'" class="msg-actions">
+              <button class="btn-icon" (click)="speak(msg.content)" title="Escuchar respuesta">
+                🔊 <span class="text-xs">Escuchar</span>
+              </button>
+            </div>
           </div>
           <div *ngIf="loading()" class="message msg-ai typing-indicator">
             Generando respuesta...
           </div>
         </div>
 
-        <div class="chat-input-area border-t p-sm">
+        <div class="chat-input-area border-t p-sm" style="display: flex; align-items: center; gap: 8px;">
           <input type="text" 
                  class="form-input" 
                  placeholder="Pregúntame sobre moda..." 
                  [(ngModel)]="userInput" 
-                 (keyup.enter)="sendMessage()">
-          <button class="btn btn-primary btn-sm ml-sm" (click)="sendMessage()" [disabled]="loading() || !userInput.trim()">
+                 (keyup.enter)="sendMessage()"
+                 style="flex: 1;">
+          
+          <button class="btn-icon mic-btn" 
+                  [class.recording]="isListening()" 
+                  (mousedown)="startListening()" 
+                  (mouseup)="stopListening()" 
+                  (mouseleave)="stopListening()"
+                  (touchstart)="startListening()"
+                  (touchend)="stopListening()"
+                  title="Mantén presionado para hablar">
+            <span *ngIf="!isListening()">🎤</span>
+            <span *ngIf="isListening()">🔴</span>
+          </button>
+          
+          <button class="btn btn-primary btn-sm" (click)="sendMessage()" [disabled]="loading() || !userInput.trim()">
             Enviar
           </button>
         </div>
@@ -101,27 +122,68 @@ interface Message {
     }
     .msg-user {
       background: var(--bg-hover);
-      align-self: flex-end;
       border-bottom-right-radius: 4px;
     }
     .msg-ai {
       background: rgba(108, 99, 255, 0.1);
       border: 1px solid rgba(108, 99, 255, 0.2);
-      align-self: flex-start;
       border-bottom-left-radius: 4px;
+    }
+    .msg-user-container {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .msg-ai-container {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .msg-actions {
+      margin-top: 4px;
+      margin-left: 4px;
+    }
+    .btn-icon {
+      background: none;
+      border: none;
+      color: var(--color-accent);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 12px;
+    }
+    .btn-icon:hover { background: rgba(108, 99, 255, 0.1); }
+    .mic-btn {
+      font-size: 1.2rem;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .mic-btn.recording {
+      background: rgba(255, 0, 0, 0.1);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
     }
     .typing-indicator { font-style: italic; opacity: 0.7; }
     .chat-input-area {
-      display: flex;
       background: var(--bg-card);
     }
-    .chat-input-area input { flex: 1; border-radius: 20px; }
+    .chat-input-area input { border-radius: 20px; }
   `]
 })
 export class ChatComponent implements AfterViewChecked {
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
   isOpen = signal(false);
+  isListening = signal(false);
   loading = signal(false);
   userInput = '';
   
@@ -129,10 +191,73 @@ export class ChatComponent implements AfterViewChecked {
     { role: 'model', content: '¡Hola! Soy tu Personal Shopper. ¿En qué te puedo ayudar hoy?' }
   ]);
 
+  private recognition: any;
+  private synth: any;
+
   constructor(
     private api: ApiService,
     public authService: AuthService
-  ) {}
+  ) {
+    this.initSpeech();
+  }
+
+  private initSpeech() {
+    // Inicializar Speech Recognition (STT)
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      this.recognition = new SpeechRecognition();
+      this.recognition.lang = 'es-ES';
+      this.recognition.interimResults = false;
+      this.recognition.maxAlternatives = 1;
+
+      this.recognition.onresult = (event: any) => {
+        const text = event.results[0][0].transcript;
+        this.userInput = text;
+      };
+
+      this.recognition.onend = () => {
+        this.isListening.set(false);
+        if (this.userInput.trim()) {
+          this.sendMessage();
+        }
+      };
+      
+      this.recognition.onerror = (event: any) => {
+        console.error('Error de reconocimiento de voz', event.error);
+        this.isListening.set(false);
+      };
+    }
+
+    // Inicializar Speech Synthesis (TTS)
+    if ('speechSynthesis' in window) {
+      this.synth = window.speechSynthesis;
+    }
+  }
+
+  startListening() {
+    if (this.recognition && !this.isListening()) {
+      this.userInput = '';
+      this.isListening.set(true);
+      this.recognition.start();
+    }
+  }
+
+  stopListening() {
+    if (this.recognition && this.isListening()) {
+      this.recognition.stop();
+    }
+  }
+
+  speak(text: string) {
+    if (this.synth) {
+      // Cancelar cualquier lectura previa
+      this.synth.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-ES';
+      utterance.rate = 1.0;
+      this.synth.speak(utterance);
+    }
+  }
 
   toggleChat() {
     this.isOpen.set(!this.isOpen());
