@@ -180,12 +180,12 @@ h1, h2, h3, h4, h5, h6 {
   transition: all var(--transition-normal);
   white-space: nowrap;
   position: relative;
-  overflow: hidden;
 
   &::before {
     content: '';
     position: absolute;
     inset: 0;
+    border-radius: inherit;
     opacity: 0;
     transition: opacity var(--transition-fast);
   }

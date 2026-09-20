@@ -12,8 +12,14 @@ import { ToastContainerComponent } from '../../../shared/components/toast-contai
   imports: [CommonModule, ReactiveFormsModule, RouterLink, ToastContainerComponent],
   template: `
     <app-toast-container />
-
     <div class="auth-page">
+      <a routerLink="/catalog" class="back-to-catalog" title="Ir al Catálogo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        <span>Catálogo</span>
+      </a>
+
       <!-- Left Panel: Branding -->
       <div class="auth-brand">
         <div class="brand-content">
@@ -154,6 +160,47 @@ import { ToastContainerComponent } from '../../../shared/components/toast-contai
     .auth-page {
       display: flex;
       min-height: 100vh;
+      position: relative;
+    }
+
+    .back-to-catalog {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: rgba(255, 255, 255, 0.8);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 8px 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 20px;
+      backdrop-filter: blur(8px);
+      transition: all 0.3s ease;
+    }
+    
+    .back-to-catalog:hover {
+      color: white;
+      background: rgba(0, 0, 0, 0.4);
+      transform: translateX(-4px);
+    }
+    
+    .back-to-catalog svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    @media (max-width: 768px) {
+      .back-to-catalog {
+        color: var(--text-primary);
+        background: var(--bg-hover);
+      }
+      .back-to-catalog:hover {
+        color: var(--color-primary);
+        background: var(--bg-card);
+      }
     }
 
     /* ── Brand Panel ── */

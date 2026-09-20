@@ -56,13 +56,13 @@
 
 <!-- Modal Form -->
 <div class="modal-backdrop" *ngIf="showModal">
-  <div class="card card-glass" style="width: 100%; max-width: 500px;">
-    <div class="card-header">
+  <div class="card card-glass" style="width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto;">
+    <div class="card-header" style="position: sticky; top: 0; z-index: 2; background: rgba(10, 14, 26, 0.95); backdrop-filter: blur(8px);">
       <h3 class="font-semibold">{{ isEditing ? 'Editar Producto' : 'Nuevo Producto' }}</h3>
       <button class="btn btn-icon btn-ghost" (click)="closeModal()">✕</button>
     </div>
     
-    <form [formGroup]="productForm" (ngSubmit)="onSubmit()">
+    <form [formGroup]="productForm" (ngSubmit)="onSubmit()" style="padding-bottom: 8px;">
       <div class="form-group">
         <label>Nombre del Producto</label>
         <input type="text" class="form-control" formControlName="name" placeholder="Ej: Camiseta básica">
@@ -85,8 +85,67 @@
       </div>
       
       <div class="form-group">
-        <label>URL de Imagen</label>
-        <input type="url" class="form-control" formControlName="image_url" placeholder="https://...">
+        <label>Sucursal Destino</label>
+        <select class="form-control" formControlName="branch_id">
+          <option [ngValue]="null" *ngIf="authService.isAdmin()">Todas las sucursales</option>
+          <option *ngFor="let b of branches" [ngValue]="b.id">{{ b.name }}</option>
+        </select>
+        <small *ngIf="!authService.isAdmin()" class="text-secondary mt-xs block">Asignado automáticamente a tu sucursal laboral.</small>
+      </div>
+      
+      <div class="form-group">
+        <label>Imagen del producto</label>
+        <input type="file" class="form-control" accept="image/*" (change)="onImageSelected($event)">
+        <small class="text-secondary">Puedes seleccionar una imagen local o dejarla vacía.</small>
+
+        <div *ngIf="productForm.get('image_url')?.value" class="mt-sm">
+          <img [src]="productForm.get('image_url')?.value" alt="Preview del producto" style="max-height: 160px; border-radius: 12px; object-fit: cover; border: 1px solid rgba(255,255,255,0.12);">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="flex items-center justify-between mb-sm">
+          <label>Variantes por talla y color</label>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="addVariant()">+ Agregar talla</button>
+        </div>
+
+        <div formArrayName="variants" class="flex flex-col gap-sm">
+          <div *ngFor="let variant of variantsArray.controls; let i = index" [formGroupName]="i" class="p-sm" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; background: rgba(255,255,255,0.02);">
+            <div class="grid-2">
+              <div class="form-group">
+                <label>Talla</label>
+                <input type="text" class="form-control" formControlName="size" placeholder="M, L, 36...">
+              </div>
+              <div class="form-group">
+                <label>Color</label>
+                <input type="text" class="form-control" formControlName="color" placeholder="Blanco, Negro...">
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label>SKU</label>
+                <input type="text" class="form-control" formControlName="sku" placeholder="Opcional">
+              </div>
+            </div>
+
+            <div class="mt-sm pt-xs border-t" style="border-top: 1px solid rgba(255,255,255,0.08);" *ngIf="branches.length > 0">
+              <label class="text-xs font-semibold text-secondary mb-xs block">Stock por Sucursal:</label>
+              <div formArrayName="inventories" class="grid-3 gap-xs">
+                <ng-container *ngFor="let invCtrl of getInventoriesArray(variant).controls; let j = index">
+                  <div [formGroupName]="j" class="form-group mb-0" *ngIf="authService.isAdmin() || invCtrl.get('branch_id')?.value === getDefaultBranchId()">
+                    <label class="text-xs text-secondary truncate block" [title]="invCtrl.get('branch_name')?.value">{{ invCtrl.get('branch_name')?.value }}</label>
+                    <input type="number" min="0" class="form-control form-control-sm" formControlName="stock">
+                  </div>
+                </ng-container>
+              </div>
+            </div>
+
+            <div class="flex justify-end mt-xs">
+              <button type="button" class="btn btn-ghost btn-sm text-danger" (click)="removeVariant(i)" *ngIf="variantsArray.length > 1">Eliminar variante</button>
+            </div>
+          </div>
+        </div>
       </div>
       
       <div class="flex justify-end gap-sm mt-lg">

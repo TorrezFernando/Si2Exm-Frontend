@@ -142,6 +142,22 @@ export class ApiService {
     return this.http.get<Category[]>(`${this.base}/categories`);
   }
 
+  // ─── RECOMMENDATIONS (Fase 3) ─────────────────────────────────────────────
+
+  getRecommendedProducts(limit: number = 10): Observable<Product[]> {
+    return this.http.get<Product[]>(`${this.base}/products/recommended`, { params: { limit } });
+  }
+
+  interactWithProduct(productId: number): Observable<any> {
+    return this.http.post(`${this.base}/products/${productId}/interact`, {});
+  }
+
+  // ─── AI CHAT (Fase 3) ─────────────────────────────────────────────────────
+
+  chatWithAI(messages: { role: string; content: string }[]): Observable<{ response: string }> {
+    return this.http.post<{ response: string }>(`${this.base}/ai/chat`, { messages });
+  }
+
   // ─── INVENTORY (CU-06, CU-07) ─────────────────────────────────────────────
 
   /** Consultar stock de una variante en todas las sucursales (CU-06) */
@@ -170,8 +186,16 @@ export class ApiService {
     return this.http.post<Reservation>(`${this.base}/reservations`, data);
   }
 
+  updateReservation(id: number, data: Partial<Reservation>): Observable<Reservation> {
+    return this.http.patch<Reservation>(`${this.base}/reservations/${id}`, data);
+  }
+
   updateReservationStatus(id: number, status: string): Observable<Reservation> {
     return this.http.patch<Reservation>(`${this.base}/reservations/${id}/status`, { status });
+  }
+
+  cancelReservation(id: number): Observable<Reservation> {
+    return this.updateReservationStatus(id, 'cancelled');
   }
 
   // ─── ORDERS (CU-10, CU-11) ────────────────────────────────────────────────

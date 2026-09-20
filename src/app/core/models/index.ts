@@ -114,16 +114,20 @@ export interface Product {
   category_id?: number;
   season?: string;
   image_url?: string;
+  garment_image_url?: string;   // Imagen para Virtual Try-On
+  garment_type?: string;        // upper_body | lower_body | dresses | full_outfit
+  has_tryon?: boolean;          // True si tiene imagen para IA
   category?: Category;
   variants?: ProductVariant[];
 }
 
 export interface ProductVariant {
-  id: number;
-  product_id: number;
+  id?: number;
+  product_id?: number;
   size: string;
   color: string;
-  sku: string;
+  sku?: string;
+  quantity?: number;
   price_override?: number;
   image_url?: string;
   inventories?: Inventory[];
@@ -147,6 +151,8 @@ export interface Reservation {
   status: ReservationStatus;
   created_at: string;
   updated_at?: string;
+  notes?: string;
+  pickup_date?: string;
   user?: User;
   branch?: Branch;
   items?: ReservationItem[];
@@ -165,6 +171,9 @@ export interface Order {
   id: number;
   user_id: number;
   branch_id?: number;
+  order_type?: string;
+  payment_method?: string;
+  payment_status?: string;
   total_amount: number;
   is_paid: boolean;
   payment_provider?: string;
@@ -179,6 +188,17 @@ export interface OrderItem {
   variant_id: number;
   quantity: number;
   unit_price: number;
+  variant?: {
+    id: number;
+    size: string;
+    color: string;
+    image_url?: string;
+    product?: {
+      id: number;
+      name: string;
+      image_url?: string;
+    }
+  };
 }
 
 // ─── Pagination ───────────────────────────────────────────────────────────

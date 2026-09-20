@@ -1,26 +1,34 @@
 <div class="content-area" style="max-width: 1200px; margin: 0 auto;">
-  <div class="flex items-center justify-between" style="padding-top: var(--space-xl); margin-bottom: var(--space-xl);">
+  <div class="flex items-center justify-between" style="padding-top: var(--space-xl); margin-bottom: var(--space-lg);">
     <div>
       <h1 style="font-size: 2.25rem; font-weight: 800; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Catálogo Exclusivo</h1>
       <p class="text-secondary mt-sm">Descubre las últimas tendencias y temporadas.</p>
     </div>
-    
-    <!-- Acciones / Filtros -->
+
+    <!-- Acciones / Usuario -->
     <div class="flex items-center gap-md">
-      <!-- Filtros -->
-      <div class="flex gap-sm">
-        <select class="form-select" style="min-width: 150px;">
-          <option value="">Todas las Categorías</option>
-        </select>
-      </div>
-      
-      <!-- Acciones de Usuario -->
       <div class="flex gap-sm border-l pl-md" style="border-left: 1px solid var(--border-subtle); padding-left: var(--space-md);">
         <ng-container *ngIf="!authService.isLoggedIn()">
           <button class="btn btn-outline" (click)="router.navigate(['/auth/login'])">Iniciar Sesión</button>
         </ng-container>
         <ng-container *ngIf="authService.isLoggedIn()">
-          <!-- Botón de Cerrar Sesión si el usuario está logueado -->
+          <button
+            *ngIf="authService.userRoleName() === 'cajero'"
+            class="btn btn-outline"
+            (click)="goToCashier()"
+            title="Volver al menú del cajero"
+          >
+            🧾 Menú cajero
+          </button>
+          <button class="btn btn-outline" (click)="router.navigate(['/profile'])" title="Mi perfil y reservas">
+            👤 Perfil
+          </button>
+          <button class="btn btn-outline" (click)="goToReservations()" title="Mis Reservas">
+            📅 Reservas
+          </button>
+          <button class="btn btn-outline" (click)="router.navigate(['/catalog/purchases'])" title="Mis Compras y Facturas">
+            🛍️ Mis Compras
+          </button>
           <button class="btn btn-outline text-danger" (click)="authService.logout()">Cerrar Sesión</button>
         </ng-container>
 
@@ -34,30 +42,89 @@
     </div>
   </div>
 
+  <!-- Barra de búsqueda -->
+  <div class="search-container mb-xl">
+    <div class="search-input-wrapper">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Explora colecciones, prendas, estilos..."
+        [(ngModel)]="searchQuery"
+        (ngModelChange)="onSearch()"
+      />
+      <button *ngIf="searchQuery" class="search-clear-btn" (click)="clearSearch()" title="Limpiar búsqueda">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Estado de búsqueda -->
+  <div *ngIf="searchQuery && filteredProducts.length > 0" class="text-secondary text-sm mb-md">
+    {{ filteredProducts.length }} resultado{{ filteredProducts.length !== 1 ? 's' : '' }} para "<strong>{{ searchQuery }}</strong>"
+  </div>
+
   <div *ngIf="loading" class="flex justify-center p-xl">
     <div class="spinner"></div>
   </div>
 
-  <div class="grid-4" *ngIf="!loading && products.length > 0">
-    <div class="card card-glass" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;" *ngFor="let prod of products">
+  <!-- Recomendados para ti (Fase 3) -->
+  <div *ngIf="!searchQuery && authService.isLoggedIn() && recommendedProducts.length > 0" class="mb-xl">
+    <h2 class="text-xl font-bold mb-md">✨ Para Ti</h2>
+    <div class="grid-4">
+      <div class="card card-glass" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;" *ngFor="let prod of recommendedProducts">
+        <div style="height: 200px; background: var(--bg-hover); position: relative; cursor: pointer;" (click)="viewProduct(prod)">
+          <img *ngIf="formatImageUrl(prod.image_url)" [src]="formatImageUrl(prod.image_url)" alt="{{prod.name}}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+          <div *ngIf="!formatImageUrl(prod.image_url)" class="flex justify-center items-center h-full text-muted"><span>Sin imagen</span></div>
+        </div>
+        <div class="p-md flex-1 flex-col justify-between">
+          <div style="cursor: pointer;" (click)="viewProduct(prod)">
+            <h3 class="font-semibold text-lg mb-xs truncate hover:text-primary transition-colors">{{ prod.name }}</h3>
+            <p class="text-xs text-secondary truncate mt-xs">📍 {{ getAvailableBranchesText(prod) }}</p>
+          </div>
+          <div class="flex items-center justify-between mt-sm">
+            <span class="font-bold text-xl text-primary">${{ prod.base_price.toFixed(2) }}</span>
+            <button class="btn btn-accent btn-sm" (click)="viewProduct(prod)">👁️ Ver</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 *ngIf="!searchQuery" class="text-xl font-bold mb-md">Todos los Productos</h2>
+
+  <!-- Grid de productos -->
+  <div class="grid-4" *ngIf="!loading && filteredProducts.length > 0">
+    <div class="card card-glass" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;" *ngFor="let prod of filteredProducts">
       <!-- Imagen clickeable -->
       <div style="height: 200px; background: var(--bg-hover); position: relative; cursor: pointer;" (click)="viewProduct(prod)">
-        <img *ngIf="prod.image_url" [src]="prod.image_url" alt="{{prod.name}}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-        <div *ngIf="!prod.image_url" class="flex justify-center items-center h-full text-muted">
+        <img *ngIf="formatImageUrl(prod.image_url)" [src]="formatImageUrl(prod.image_url)" alt="{{prod.name}}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <div *ngIf="!formatImageUrl(prod.image_url)" class="flex justify-center items-center h-full text-muted">
           <span>Sin imagen</span>
         </div>
         <span *ngIf="prod.season" class="badge badge-primary" style="position: absolute; top: 12px; right: 12px; pointer-events: none;">{{ prod.season }}</span>
+        <!-- Badge IA Try-On -->
+        <span *ngIf="prod.image_url || prod.garment_image_url" class="badge" style="position: absolute; top: 12px; left: 12px; background: rgba(108,99,255,0.85); color: white; pointer-events: none; font-size: 0.7rem;">✨ IA</span>
       </div>
-      
+
       <!-- Contenido -->
       <div class="p-md flex-1 flex-col justify-between">
         <div style="cursor: pointer;" (click)="viewProduct(prod)">
           <h3 class="font-semibold text-lg mb-xs truncate hover:text-primary transition-colors">{{ prod.name }}</h3>
-          <p class="text-secondary text-sm mb-md" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+          <p class="text-secondary text-sm mb-xs" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
             {{ prod.description || 'Sin descripción disponible.' }}
           </p>
+          <p class="text-xs text-primary font-semibold mt-xs mb-sm">
+            <span class="text-secondary font-normal">📍 Sucursales:</span> {{ getAvailableBranchesText(prod) }}
+          </p>
         </div>
-        
+
         <div class="flex items-center justify-between mt-sm">
           <span class="font-bold text-xl text-primary">${{ prod.base_price.toFixed(2) }}</span>
           <button class="btn btn-accent btn-sm" (click)="viewProduct(prod)">
@@ -68,6 +135,14 @@
     </div>
   </div>
 
+  <!-- Sin resultados búsqueda -->
+  <div *ngIf="!loading && filteredProducts.length === 0 && searchQuery" class="card card-glass text-center p-xl mt-lg">
+    <div style="font-size: 3rem; margin-bottom: var(--space-md);">🔍</div>
+    <h3 class="font-semibold text-xl mb-sm">Sin resultados para "{{ searchQuery }}"</h3>
+    <p class="text-secondary">Intenta con otro término o <button class="btn btn-sm btn-outline" (click)="clearSearch()">ver todos los productos</button></p>
+  </div>
+
+  <!-- Catálogo vacío -->
   <div *ngIf="!loading && products.length === 0" class="card card-glass text-center p-xl mt-lg">
     <div style="font-size: 3rem; margin-bottom: var(--space-md);">🛍️</div>
     <h3 class="font-semibold text-xl mb-sm">No hay productos disponibles</h3>

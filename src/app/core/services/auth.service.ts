@@ -18,7 +18,7 @@ export class AuthService {
 
   readonly currentUser  = this._currentUser.asReadonly();
   readonly isLoading    = this._isLoading.asReadonly();
-  readonly isLoggedIn   = computed(() => !!this._currentUser());
+  readonly isLoggedIn   = computed(() => !!this._currentUser() && !!this.getToken());
   
   // Computar permisos
   readonly userPermissions = computed(() => {
@@ -130,8 +130,17 @@ export class AuthService {
 
   private loadUserFromStorage(): User | null {
     try {
+      const token = localStorage.getItem(this.TOKEN_KEY);
+      if (!token) {
+        localStorage.removeItem(this.USER_KEY);
+        return null;
+      }
       const raw = localStorage.getItem(this.USER_KEY);
       return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
+    } catch {
+      localStorage.removeItem(this.TOKEN_KEY);
+      localStorage.removeItem(this.USER_KEY);
+      return null;
+    }
   }
 }

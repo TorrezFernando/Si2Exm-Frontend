@@ -36,6 +36,13 @@ export const routes: Routes = [
       import('./features/catalog/catalog.routes').then(m => m.catalogRoutes)
   },
 
+  // ─── Perfil del usuario con sus reservas ──────────────────────────────
+  {
+    path: 'profile',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/catalog/my-reservations.component').then(m => m.MyReservationsComponent)
+  },
+
   // ─── Carrito ───────────────────────────────────────────────────────────
   {
     path: 'cart',

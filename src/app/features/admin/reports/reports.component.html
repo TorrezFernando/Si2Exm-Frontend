@@ -1,0 +1,160 @@
+<div class="reports-container">
+  <div class="header-section">
+    <h1>Reportes de Ventas</h1>
+    <p class="subtitle">Analiza las ventas, descargas e ingresos de las sucursales</p>
+  </div>
+
+  <div class="filters-card">
+    <div class="filter-group">
+      <label>Desde</label>
+      <input type="date" [(ngModel)]="startDate" class="form-input">
+    </div>
+    <div class="filter-group">
+      <label>Hasta</label>
+      <input type="date" [(ngModel)]="endDate" class="form-input">
+    </div>
+    <div class="filter-group">
+      <label>Tipo de Orden</label>
+      <select [(ngModel)]="orderType" class="form-input">
+        <option value="">Todas</option>
+        <option value="presencial">Presencial (Tienda)</option>
+        <option value="reserva_pickup">Reserva (Recojo)</option>
+        <option value="online_delivery">Delivery Online</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Método de Pago</label>
+      <select [(ngModel)]="paymentMethod" class="form-input">
+        <option value="">Todos</option>
+        <option value="tarjeta">Tarjeta</option>
+        <option value="efectivo">Efectivo</option>
+        <option value="qr">Código QR</option>
+        <option value="transferencia">Transferencia</option>
+      </select>
+    </div>
+    
+    <div class="filter-actions">
+      <button class="btn btn-primary" (click)="loadReport()">Filtrar</button>
+    </div>
+  </div>
+
+  <div class="summary-cards">
+    <div class="stat-card">
+      <div class="stat-title">Ingresos Totales</div>
+      <div class="stat-value text-success">${{ totalRevenue | number:'1.2-2' }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">Ventas Registradas</div>
+      <div class="stat-value">{{ totalCount }}</div>
+    </div>
+    <div class="export-actions">
+      <button class="btn btn-outline" (click)="download('pdf')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        Descargar PDF
+      </button>
+      <button class="btn btn-outline excel-btn" (click)="download('excel')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <rect x="8" y="13" width="8" height="4"/>
+        </svg>
+        Descargar Excel
+      </button>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div *ngIf="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Cargando datos...</p>
+    </div>
+
+    <div *ngIf="error" class="error-message">
+      {{ error }}
+    </div>
+
+    <table class="data-table" *ngIf="!loading && !error">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Fecha</th>
+          <th>Sucursal</th>
+          <th>Cliente</th>
+          <th>Tipo Orden</th>
+          <th>Pago</th>
+          <th class="text-right">Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let sale of sales">
+          <td>#{{ sale.id }}</td>
+          <td>{{ sale.date | date:'short' }}</td>
+          <td>
+            <span class="badge" [class.badge-primary]="sale.branch !== 'Online'" [class.badge-info]="sale.branch === 'Online'">
+              {{ sale.branch }}
+            </span>
+          </td>
+          <td>{{ sale.customer_email }}</td>
+          <td>{{ sale.order_type }}</td>
+          <td>{{ sale.payment_method }}</td>
+          <td class="text-right font-medium">${{ sale.total_amount | number:'1.2-2' }}</td>
+        </tr>
+        <tr *ngIf="sales.length === 0">
+          <td colspan="7" class="text-center empty-state">No se encontraron ventas para estos filtros.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- AI Chat Floating Button -->
+  <button class="ai-fab" (click)="toggleChat()" *ngIf="!chatOpen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      <path d="M12 11h.01M8 11h.01M16 11h.01"/>
+    </svg>
+  </button>
+
+  <!-- AI Chat Panel -->
+  <div class="ai-chat-panel" *ngIf="chatOpen">
+    <div class="chat-header">
+      <div class="chat-title">
+        <div class="chat-icon">✨</div>
+        <span>Asistente IA de Reportes</span>
+      </div>
+      <button class="close-btn" (click)="toggleChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="chat-messages">
+      <div *ngIf="chatHistory.length === 0" class="empty-chat">
+        Hola, soy tu analista financiero. Pregúntame sobre los datos que estás viendo en la tabla.
+      </div>
+      <div *ngFor="let msg of chatHistory" class="chat-msg" [class.user]="msg.role === 'user'">
+        <div class="msg-bubble">{{ msg.content }}</div>
+      </div>
+      <div *ngIf="chatLoading" class="chat-msg ai">
+        <div class="msg-bubble typing">Analizando datos...</div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <input type="text" [(ngModel)]="chatMessage" (keyup.enter)="sendChatMessage()" placeholder="Pregunta algo sobre el reporte..." [disabled]="chatLoading">
+      <button class="send-btn" (click)="sendChatMessage()" [disabled]="chatLoading || !chatMessage.trim()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>

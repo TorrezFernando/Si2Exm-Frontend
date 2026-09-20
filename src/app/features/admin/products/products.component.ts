@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { Product } from '../../../core/models';
+import { AuthService } from '../../../core/services/auth.service';
+import { Product, ProductVariant, Branch } from '../../../core/models';
 
 @Component({
   selector: 'app-products',
@@ -13,6 +14,7 @@ import { Product } from '../../../core/models';
 })
 export class ProductsComponent implements OnInit {
   products: Product[] = [];
+  branches: Branch[] = [];
   
   showModal = false;
   isEditing = false;
@@ -24,18 +26,74 @@ export class ProductsComponent implements OnInit {
   constructor(
     private api: ApiService,
     private fb: FormBuilder,
-    private toast: ToastService
+    private toast: ToastService,
+    public authService: AuthService
   ) {
     this.productForm = this.fb.group({
       name: ['', Validators.required],
       description: [''],
       base_price: [0, [Validators.required, Validators.min(0)]],
       season: [''],
-      image_url: ['']
+      branch_id: [null],
+      image_url: [''],
+      variants: this.fb.array([this.createVariantGroup()])
     });
   }
 
+  get variantsArray(): FormArray {
+    return this.productForm.get('variants') as FormArray;
+  }
+
+  createVariantGroup(variant?: Partial<ProductVariant>): FormGroup {
+    const userBranchId = this.getDefaultBranchId();
+
+    const invArray = this.fb.array(
+      (this.branches || []).map(b => {
+        const existingInv = variant?.inventories?.find(i => i.branch_id === b.id);
+        const defaultStock = existingInv ? existingInv.stock : 0;
+        return this.fb.group({
+          branch_id: [b.id],
+          branch_name: [b.name],
+          stock: [defaultStock, [Validators.required, Validators.min(0)]]
+        });
+      })
+    );
+
+    return this.fb.group({
+      id: [variant?.id ?? null],
+      size: [variant?.size ?? 'M'],
+      color: [variant?.color ?? 'Único'],
+      quantity: [variant?.quantity ?? 1, [Validators.required, Validators.min(0)]],
+      sku: [variant?.sku ?? ''],
+      inventories: invArray
+    });
+  }
+
+  getInventoriesArray(variantControl: any): FormArray {
+    return variantControl.get('inventories') as FormArray;
+  }
+
+  setVariants(variants?: ProductVariant[]): void {
+    this.variantsArray.clear();
+    if (variants && variants.length > 0) {
+      variants.forEach(v => this.variantsArray.push(this.createVariantGroup(v)));
+    } else {
+      this.variantsArray.push(this.createVariantGroup());
+    }
+  }
+
+  addVariant(): void {
+    this.variantsArray.push(this.createVariantGroup());
+  }
+
+  removeVariant(index: number): void {
+    if (this.variantsArray.length > 1) {
+      this.variantsArray.removeAt(index);
+    }
+  }
+
   ngOnInit(): void {
+    this.loadBranches();
     this.loadProducts();
   }
 
@@ -46,23 +104,67 @@ export class ProductsComponent implements OnInit {
     });
   }
 
+  loadBranches() {
+    this.api.getBranches(true).subscribe({
+      next: (res: Branch[]) => {
+        this.branches = res;
+        // Re-initialize variants if branches were loaded after component creation
+        if (this.showModal && this.variantsArray.length > 0) {
+          const currentVal = this.productForm.value;
+          this.setVariants(this.isEditing ? this.products.find(p => p.id === this.editingId)?.variants : undefined);
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  getDefaultBranchId(): number | null {
+    const user = this.authService.currentUser();
+    if (user?.branch_id) {
+      return user.branch_id;
+    }
+    return null;
+  }
+
   openCreateModal() {
     this.isEditing = false;
     this.editingId = null;
-    this.productForm.reset({ base_price: 0 });
+    const defaultBranch = this.getDefaultBranchId();
+    this.productForm.reset({
+      name: '',
+      description: '',
+      base_price: 0,
+      season: '',
+      branch_id: defaultBranch,
+      image_url: ''
+    });
+    if (!this.authService.isAdmin()) {
+      this.productForm.get('branch_id')?.disable();
+    } else {
+      this.productForm.get('branch_id')?.enable();
+    }
+    this.setVariants();
     this.showModal = true;
   }
 
   openEditModal(product: Product) {
     this.isEditing = true;
     this.editingId = product.id;
-    this.productForm.patchValue({
+    const defaultBranch = this.getDefaultBranchId();
+    this.productForm.reset({
       name: product.name,
       description: product.description,
       base_price: product.base_price,
       season: product.season,
-      image_url: product.image_url
+      branch_id: defaultBranch,
+      image_url: product.image_url ?? ''
     });
+    if (!this.authService.isAdmin()) {
+      this.productForm.get('branch_id')?.disable();
+    } else {
+      this.productForm.get('branch_id')?.enable();
+    }
+    this.setVariants(product.variants);
     this.showModal = true;
   }
 
@@ -70,12 +172,61 @@ export class ProductsComponent implements OnInit {
     this.showModal = false;
   }
 
+  onImageSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      this.productForm.patchValue({ image_url: result });
+    };
+    reader.readAsDataURL(file);
+  }
+
   onSubmit() {
-    if (this.productForm.invalid) return;
+    if (this.productForm.invalid) {
+      this.toast.error('Por favor completa todos los campos requeridos.');
+      return;
+    }
     this.loading = true;
-    
-    const data = this.productForm.value;
-    
+
+    const rawForm = this.productForm.getRawValue();
+    const rawVariants = this.variantsArray?.getRawValue() ?? [];
+    const selectedBranchId = rawForm.branch_id ?? this.getDefaultBranchId();
+
+    const variants = rawVariants.map((v: any) => {
+      const inventories = (v.inventories || []).map((inv: any) => ({
+        branch_id: inv.branch_id,
+        stock: Number(inv.stock ?? 0)
+      }));
+
+      const totalQty = inventories.length
+        ? inventories.reduce((sum: number, inv: any) => sum + inv.stock, 0)
+        : Number(v.quantity ?? 0);
+
+      return {
+        id: v.id ?? null,
+        size: (v.size || 'M').trim(),
+        color: (v.color || 'Único').trim(),
+        quantity: totalQty,
+        branch_id: selectedBranchId,
+        sku: (v.sku || '').trim(),
+        inventories
+      };
+    });
+
+    const data = {
+      name: rawForm.name,
+      description: rawForm.description,
+      base_price: Number(rawForm.base_price || 0),
+      season: rawForm.season,
+      branch_id: selectedBranchId,
+      image_url: rawForm.image_url,
+      variants
+    };
+
     if (this.isEditing && this.editingId) {
       this.api.updateProduct(this.editingId, data).subscribe({
         next: (res: Product) => {
@@ -85,7 +236,8 @@ export class ProductsComponent implements OnInit {
           this.loading = false;
         },
         error: (err: any) => {
-          this.toast.error('Error al actualizar');
+          console.error('Error updating product:', err);
+          this.toast.error(err?.error?.detail || 'Error al actualizar producto');
           this.loading = false;
         }
       });
@@ -98,7 +250,8 @@ export class ProductsComponent implements OnInit {
           this.loading = false;
         },
         error: (err: any) => {
-          this.toast.error('Error al crear producto');
+          console.error('Error creating product:', err);
+          this.toast.error(err?.error?.detail || 'Error al crear producto');
           this.loading = false;
         }
       });

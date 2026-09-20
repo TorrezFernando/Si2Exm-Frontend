@@ -63,15 +63,23 @@ interface NavItem {
           </ng-container>
         </nav>
 
-        <!-- Logout -->
-        <button class="sidebar-logout" (click)="auth.logout()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-          @if (!sidebarCollapsed()) { <span>Cerrar sesión</span> }
-        </button>
+        <div class="sidebar-actions">
+          <button class="sidebar-link" [routerLink]="['/profile']">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <path d="M20 21a8 8 0 0 0-16 0"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            @if (!sidebarCollapsed()) { <span>Mi perfil</span> }
+          </button>
+          <button class="sidebar-logout" (click)="auth.logout()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            @if (!sidebarCollapsed()) { <span>Cerrar sesión</span> }
+          </button>
+        </div>
       </aside>
 
       <!-- ── Main Content ────────────────────────────────────────── -->
@@ -192,6 +200,13 @@ interface NavItem {
 
     .nav-label { font-size: 0.88rem; font-weight: 500; }
 
+    .sidebar-actions {
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-link,
     .sidebar-logout {
       display: flex;
       align-items: center;
@@ -199,10 +214,11 @@ interface NavItem {
       padding: 14px 18px;
       color: var(--text-muted);
       font-size: 0.88rem;
-      border-top: 1px solid var(--border-subtle);
       transition: all var(--transition-fast);
-      &:hover { color: var(--color-danger); background: rgba(248,113,113,0.08); }
+      &:hover { color: var(--color-primary); background: rgba(108,99,255,0.08); }
     }
+
+    .sidebar-logout:hover { color: var(--color-danger); background: rgba(248,113,113,0.08); }
 
     /* ── Main ── */
     .main-content {
@@ -278,6 +294,14 @@ export class AdminLayoutComponent {
       </svg>`
     },
     {
+      label: 'Reportes',
+      route: '/admin/reports',
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+        <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+        <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+      </svg>`
+    },
+    {
       label: 'Bitácora',
       route: '/admin/audit',
       permissions: ['audit:read'],
@@ -294,6 +318,11 @@ export class AdminLayoutComponent {
   constructor(public auth: AuthService) {}
 
   canShowItem(item: NavItem): boolean {
+    if (item.route === '/admin/reports') {
+      const role = this.auth.userRoleName()?.toLowerCase() || '';
+      if (role.includes('cajero')) return false;
+      return true;
+    }
     if (!item.permissions || item.permissions.length === 0) return true;
     return item.permissions.some(p => this.auth.hasPermission(p));
   }

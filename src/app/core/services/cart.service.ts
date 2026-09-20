@@ -73,6 +73,20 @@ export class CartService {
   }
 
   /**
+   * Actualiza la cantidad de un producto
+   */
+  updateQuantity(index: number, delta: number) {
+    const current = this.cartItems();
+    if (current[index]) {
+      current[index].quantity += delta;
+      if (current[index].quantity <= 0) {
+        current.splice(index, 1);
+      }
+      this.saveCart([...current]);
+    }
+  }
+
+  /**
    * Limpia todo el carrito
    */
   clearCart() {

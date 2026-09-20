@@ -66,10 +66,22 @@ import { ToastContainerComponent } from '../../../shared/components/toast-contai
                 <label>Contraseña *</label>
                 <input [type]="showPwd() ? 'text' : 'password'" class="form-control"
                   [class.is-invalid]="isInvalid('password')"
-                  formControlName="password" placeholder="Mín. 6 caracteres" />
-                @if (isInvalid('password')) {
-                  <span class="form-error">Mínimo 6 caracteres</span>
-                }
+                  formControlName="password" placeholder="Ingresa tu contraseña" />
+                
+                <div class="password-checklist mt-sm" *ngIf="registerForm.get('password')?.touched || registerForm.get('password')?.value">
+                  <div class="check-item text-sm" [class.text-success]="hasUpper()" [class.text-secondary]="!hasUpper()">
+                    <span class="icon">{{ hasUpper() ? '✓' : '○' }}</span> Al menos 1 mayúscula
+                  </div>
+                  <div class="check-item text-sm" [class.text-success]="hasNumber()" [class.text-secondary]="!hasNumber()">
+                    <span class="icon">{{ hasNumber() ? '✓' : '○' }}</span> Al menos 1 número
+                  </div>
+                  <div class="check-item text-sm" [class.text-success]="hasSpecial()" [class.text-secondary]="!hasSpecial()">
+                    <span class="icon">{{ hasSpecial() ? '✓' : '○' }}</span> Al menos 1 carácter especial
+                  </div>
+                  <div class="check-item text-sm" [class.text-success]="hasMinLength()" [class.text-secondary]="!hasMinLength()">
+                    <span class="icon">{{ hasMinLength() ? '✓' : '○' }}</span> Mínimo 6 caracteres
+                  </div>
+                </div>
               </div>
 
               <div class="form-group">
@@ -174,6 +186,9 @@ import { ToastContainerComponent } from '../../../shared/components/toast-contai
       }
       h2 { margin-bottom: 8px; }
     }
+    .password-checklist { display: flex; flex-direction: column; gap: 4px; padding: 8px; background: var(--bg-hover); border-radius: var(--radius-sm); }
+    .check-item { display: flex; align-items: center; gap: 6px; }
+    .check-item .icon { font-weight: bold; font-size: 14px; width: 14px; text-align: center; }
   `]
 })
 export class RegisterComponent {
@@ -191,11 +206,30 @@ export class RegisterComponent {
       full_name:       [''],
       phone:           [''],
       email:           ['', [Validators.required, Validators.email]],
-      password:        ['', [Validators.required, Validators.minLength(6)]],
+      password:        ['', [Validators.required, Validators.minLength(6), this.passwordPolicyValidator]],
       confirmPassword: ['', Validators.required],
       terms:           [false, Validators.requiredTrue]
     });
   }
+
+  passwordPolicyValidator(control: AbstractControl) {
+    const value = control.value || '';
+    const hasUpper = /[A-Z]/.test(value);
+    const hasNumber = /[0-9]/.test(value);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(value);
+    const minLength = value.length >= 6;
+    if (hasUpper && hasNumber && hasSpecial && minLength) return null;
+    return { passwordPolicy: true };
+  }
+
+  get pwdValue(): string {
+    return this.registerForm.get('password')?.value || '';
+  }
+
+  hasUpper(): boolean { return /[A-Z]/.test(this.pwdValue); }
+  hasNumber(): boolean { return /[0-9]/.test(this.pwdValue); }
+  hasSpecial(): boolean { return /[!@#$%^&*(),.?":{}|<>]/.test(this.pwdValue); }
+  hasMinLength(): boolean { return this.pwdValue.length >= 6; }
 
   isInvalid(f: string): boolean {
     const c = this.registerForm.get(f);

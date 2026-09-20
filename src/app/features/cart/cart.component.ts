@@ -1,10 +1,11 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { CartService } from '../../core/services/cart.service';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { FormsModule } from '@angular/forms';
+import { Branch } from '../../core/models';
 
 @Component({
   selector: 'app-cart',
@@ -50,9 +51,11 @@ import { FormsModule } from '@angular/forms';
             <div class="flex items-center gap-lg">
               <div class="font-semibold text-lg">\${{ item.unit_price.toFixed(2) }}</div>
               <div class="flex items-center gap-sm">
-                <span class="text-sm">Cant: {{ item.quantity }}</span>
+                <button class="btn btn-sm btn-outline" style="padding: 2px 8px;" (click)="updateQuantity(i, -1)">-</button>
+                <span class="text-sm font-semibold" style="min-width: 20px; text-align: center;">{{ item.quantity }}</span>
+                <button class="btn btn-sm btn-outline" style="padding: 2px 8px;" (click)="updateQuantity(i, 1)">+</button>
               </div>
-              <button class="btn btn-sm btn-outline text-danger" (click)="removeItem(i)">✕</button>
+              <button class="btn btn-sm btn-outline text-danger ml-sm" (click)="removeItem(i)">✕</button>
             </div>
           </div>
         </div>
@@ -84,7 +87,7 @@ import { FormsModule } from '@angular/forms';
 
     <!-- Modal de Pago Simulado (Pasarela) -->
     <div class="modal-backdrop" *ngIf="showPaymentModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center;">
-      <div class="card" style="width: 100%; max-width: 550px; padding: var(--space-2xl); position: relative;">
+      <div class="card" style="width: 100%; max-width: 700px; padding: var(--space-2xl); position: relative;">
         <!-- Botón cerrar modal -->
         <button class="btn btn-sm btn-outline" style="position: absolute; top: var(--space-md); right: var(--space-md);" (click)="showPaymentModal = false">✕</button>
         
@@ -110,11 +113,12 @@ import { FormsModule } from '@angular/forms';
           <div class="grid grid-2 gap-md">
             <div>
               <label class="form-label mb-xs block">Vencimiento</label>
-              <input type="text" class="form-control p-sm" placeholder="MM/YY">
+              <input type="text" class="form-control p-sm" placeholder="MM/YY" [(ngModel)]="cardExpiry">
+              <small *ngIf="cardExpiry && cardExpiry.length >= 4 && !isExpiryValid()" class="text-danger mt-xs block">Tarjeta vencida o inválida.</small>
             </div>
             <div>
               <label class="form-label mb-xs block">CVV</label>
-              <input type="password" autocomplete="new-password" class="form-control p-sm" placeholder="***">
+              <input type="password" autocomplete="new-password" class="form-control p-sm" placeholder="***" [(ngModel)]="cardCvv">
             </div>
           </div>
         </div>
@@ -135,13 +139,36 @@ import { FormsModule } from '@angular/forms';
         </div>
         
         <!-- Formulario Reserva -->
-        <div *ngIf="paymentMethod === 'reserva'" class="flex-col gap-md mb-xl animate-fade-in text-center p-md border rounded" style="background: rgba(108, 99, 255, 0.05); border-color: rgba(108, 99, 255, 0.2);">
-          <div style="font-size: 2.5rem; margin-bottom: var(--space-sm);">🛍️</div>
-          <h3 class="font-semibold text-lg text-primary">Reserva en Tienda</h3>
-          <p class="text-secondary text-sm">Tus productos serán separados. Podrás pagarlos y recogerlos en la sucursal que elijas.</p>
+        <div *ngIf="paymentMethod === 'reserva'" class="flex-col gap-md mb-xl animate-fade-in text-left p-md border rounded" style="background: rgba(108, 99, 255, 0.05); border-color: rgba(108, 99, 255, 0.2);">
+          <div class="flex items-center gap-sm mb-sm">
+            <span style="font-size: 2rem;">🛍️</span>
+            <div>
+              <h3 class="font-semibold text-lg text-primary" style="margin: 0;">Reserva en Tienda</h3>
+              <p class="text-secondary text-sm" style="margin: 0;">Tus productos serán separados para pagar y recoger.</p>
+            </div>
+          </div>
+          
+          <div>
+            <label class="form-label mb-xs block">Sucursal de Retiro</label>
+            <select class="form-control p-sm w-full" [(ngModel)]="reservaBranchId">
+              <option *ngFor="let b of branches" [value]="b.id">{{ b.name }}</option>
+            </select>
+          </div>
+          
+          <div class="grid grid-2 gap-md">
+            <div>
+              <label class="form-label mb-xs block">Día de Retiro (Máx 2 días)</label>
+              <input type="date" class="form-control p-sm w-full" [(ngModel)]="reservaDate" [min]="minDate" [max]="maxDate">
+            </div>
+            <div>
+              <label class="form-label mb-xs block">Hora aproximada (07:00 a 20:00)</label>
+              <input type="time" class="form-control p-sm w-full" [(ngModel)]="reservaTime" min="07:00" max="20:00">
+              <small *ngIf="reservaTime && !isTimeValid()" class="text-danger mt-xs block">La hora debe estar entre 07:00 y 20:00.</small>
+            </div>
+          </div>
         </div>
 
-        <button class="btn btn-accent w-full" style="padding: var(--space-md) 0;" [disabled]="isProcessing" (click)="processPayment()">
+        <button class="btn btn-accent w-full mt-lg" style="padding: var(--space-md) 0; margin-top: 1.5rem;" [disabled]="isProcessing || !canPay()" (click)="processPayment()">
           {{ isProcessing ? 'Procesando pago...' : 'Pagar Ahora' }}
         </button>
       </div>
@@ -152,11 +179,21 @@ import { FormsModule } from '@angular/forms';
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
   `]
 })
-export class CartComponent {
+export class CartComponent implements OnInit {
   showPaymentModal = false;
   paymentMethod: 'tarjeta' | 'qr' | 'reserva' = 'tarjeta';
   isProcessing = false;
   cardNumber = '4242424242424242'; // Simulador default
+  cardExpiry = '12/25';
+  cardCvv = '123';
+  
+  branches: Branch[] = [];
+  reservaBranchId: number | null = null;
+  reservaDate: string = '';
+  reservaTime: string = '';
+  minDate = '';
+  maxDate = '';
+
   private cartService = inject(CartService);
 
   // Usamos computed para acceder reactivamente a los datos del CartService
@@ -169,8 +206,65 @@ export class CartComponent {
     public router: Router
   ) {}
 
+  ngOnInit() {
+    this.apiService.getBranches(true).subscribe(b => {
+      this.branches = b;
+      if (b.length > 0) this.reservaBranchId = b[0].id;
+    });
+    
+    const today = new Date();
+    this.minDate = today.toISOString().split('T')[0];
+    this.reservaDate = this.minDate;
+    
+    const max = new Date();
+    max.setDate(max.getDate() + 2);
+    this.maxDate = max.toISOString().split('T')[0];
+  }
+
   removeItem(index: number) {
     this.cartService.removeFromCart(index);
+  }
+
+  updateQuantity(index: number, delta: number) {
+    this.cartService.updateQuantity(index, delta);
+  }
+
+  canPay(): boolean {
+    if (this.paymentMethod === 'tarjeta') {
+      return !!(this.cardNumber && this.cardNumber.length >= 14 && this.isExpiryValid() && this.cardCvv && this.cardCvv.length >= 3);
+    }
+    if (this.paymentMethod === 'reserva') {
+      return !!(this.reservaBranchId && this.reservaDate && this.reservaTime && this.isTimeValid());
+    }
+    return true;
+  }
+
+  isTimeValid(): boolean {
+    if (!this.reservaTime) return false;
+    const [hours, minutes] = this.reservaTime.split(':').map(Number);
+    // 07:00 to 20:00 inclusive
+    if (hours < 7 || hours > 20) return false;
+    if (hours === 20 && minutes > 0) return false;
+    return true;
+  }
+
+  isExpiryValid(): boolean {
+    if (!this.cardExpiry) return false;
+    const parts = this.cardExpiry.split('/');
+    if (parts.length !== 2) return false;
+    const month = parseInt(parts[0], 10);
+    const year = parseInt(parts[1], 10);
+    
+    if (isNaN(month) || isNaN(year) || month < 1 || month > 12) return false;
+
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1; // 1-12
+    const currentYear = today.getFullYear() % 100; // ej. 26 para 2026
+
+    if (year < currentYear) return false;
+    if (year === currentYear && month < currentMonth) return false;
+
+    return true;
   }
 
   processPayment() {
@@ -178,36 +272,53 @@ export class CartComponent {
     
     // Preparar el payload para la API
     const items = this.cartItems().map(item => ({
-      variant_id: item.variant?.id ?? 0, // Si no hay variante, enviamos 0 (idealmente habría que prevenir esto agregando variantes default)
+      variant_id: item.variant?.id ?? 0,
       quantity: item.quantity,
       unit_price: item.unit_price
     }));
 
-    const orderData = {
-      items: items,
-      order_type: this.paymentMethod === 'reserva' ? 'reserva_pickup' : 'online_delivery',
-      payment_method: this.paymentMethod === 'reserva' ? 'efectivo' : this.paymentMethod,
-      card_type: this.paymentMethod === 'tarjeta' ? 'Simulada' : null,
-      card_last_four: this.paymentMethod === 'tarjeta' ? this.cardNumber.slice(-4) : null,
-      transaction_ref: 'TXN-WEB-' + Math.floor(Math.random() * 1000000)
-    };
-
     // Simulamos un delay de red para efecto realista
     setTimeout(() => {
-      this.apiService.createOrder(orderData).subscribe({
-        next: (res) => {
-          this.toast.success('¡Pago completado! Tu orden se generó con éxito.');
-          this.cartService.clearCart();
-          this.isProcessing = false;
-          this.showPaymentModal = false;
-          this.router.navigate(['/catalog']); // Redirigir al inicio o página de éxito
-        },
-        error: (err) => {
-          this.toast.error('Ocurrió un error al procesar el pago.');
-          console.error(err);
-          this.isProcessing = false;
-        }
-      });
+      if (this.paymentMethod === 'reserva') {
+        // Create Reservation API Call
+        const payload = {
+          branch_id: this.reservaBranchId!,
+          items: items.map(i => ({ variant_id: i.variant_id, quantity: i.quantity })),
+          notes: `Recojo: ${this.reservaDate} a las ${this.reservaTime}`
+        };
+        this.apiService.createReservation(payload).subscribe({
+          next: () => this.handleSuccess('¡Reserva completada! Te esperamos en la tienda.'),
+          error: (err) => this.handleError(err)
+        });
+      } else {
+        // Create Order API Call
+        const orderData = {
+          items: items,
+          order_type: 'online_delivery',
+          payment_method: this.paymentMethod,
+          card_type: this.paymentMethod === 'tarjeta' ? 'Simulada' : null,
+          card_last_four: this.paymentMethod === 'tarjeta' ? this.cardNumber.slice(-4) : null,
+          transaction_ref: 'TXN-WEB-' + Math.floor(Math.random() * 1000000)
+        };
+        this.apiService.createOrder(orderData).subscribe({
+          next: () => this.handleSuccess('¡Pago completado! Tu orden se generó con éxito.'),
+          error: (err) => this.handleError(err)
+        });
+      }
     }, 1500);
+  }
+
+  private handleSuccess(msg: string) {
+    this.toast.success(msg);
+    this.cartService.clearCart();
+    this.isProcessing = false;
+    this.showPaymentModal = false;
+    this.router.navigate(['/catalog']);
+  }
+
+  private handleError(err: any) {
+    this.toast.error('Ocurrió un error al procesar el pago.');
+    console.error(err);
+    this.isProcessing = false;
   }
 }
