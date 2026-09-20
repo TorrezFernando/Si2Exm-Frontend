@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    container_name: fashionstore_frontend
+    ports:
+      - "80:80"
+    restart: always
+    networks:
+      - fashion_net
+
+networks:
+  fashion_net:
+    external: true
+    name: fashion_net

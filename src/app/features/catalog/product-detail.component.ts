@@ -165,7 +165,8 @@ export class ProductDetailComponent implements OnInit {
       return clean;
     }
     if (clean.startsWith('/')) {
-      return `http://localhost:8000${clean}`;
+      const baseUrl = environment.apiUrl.replace('/api/v1', '');
+      return `${baseUrl}${clean}`;
     }
     return clean;
   }

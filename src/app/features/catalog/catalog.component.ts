@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -175,7 +176,8 @@ export class CatalogComponent implements OnInit {
       return clean;
     }
     if (clean.startsWith('/')) {
-      return `http://localhost:8000${clean}`;
+      const baseUrl = environment.apiUrl.replace('/api/v1', '');
+      return `${baseUrl}${clean}`;
     }
     return clean;
   }
